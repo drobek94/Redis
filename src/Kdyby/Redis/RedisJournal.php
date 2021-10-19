@@ -12,6 +12,8 @@ declare(strict_types = 1);
 
 namespace Kdyby\Redis;
 
+use Nette\Caching\Cache;
+
 /**
  * Redis journal for tags and priorities of cached values.
  */
@@ -57,7 +59,7 @@ class RedisJournal implements \Nette\Caching\Storages\Journal
 		$this->client->multi();
 
 		// add entry to each tag & tag to entry
-		$tags = empty($dp[\Nette\Caching\Cache::TAGS]) ? [] : (array) $dp[\Nette\Caching\Cache::TAGS];
+		$tags = empty($dp[Cache::TAGS]) ? [] : (array) $dp[Cache::TAGS];
 		foreach (\array_unique($tags) as $tag) {
 			$tagKeyName = $this->formatKey($tag, self::KEYS);
 			$keyTagName = $this->formatKey($key, self::TAGS);
@@ -66,7 +68,7 @@ class RedisJournal implements \Nette\Caching\Storages\Journal
 		}
 
 		if (isset($dp[Cache::EXPIRE])) {
-			$this->client->expire($keyTagName, $dp[Cache::EXPIRE]);
+			$this->client->expire($this->formatKey($tag, self::KEYS), $dp[Cache::EXPIRE]);
 		}
 
 		$this->client->exec();
@@ -105,7 +107,7 @@ class RedisJournal implements \Nette\Caching\Storages\Journal
 	 */
 	public function clean(array $conds): ?array
 	{
-		if (!empty($conds[\Nette\Caching\Cache::ALL])) {
+		if (!empty($conds[Cache::ALL])) {
 			$all = $this->client->keys(self::NS_NETTE . ':*');
 
 			$this->client->multi();
@@ -115,15 +117,15 @@ class RedisJournal implements \Nette\Caching\Storages\Journal
 		}
 
 		$entries = [];
-		if (!empty($conds[\Nette\Caching\Cache::TAGS])) {
+		if (!empty($conds[Cache::TAGS])) {
 			foreach ((array) $conds[\Nette\Caching\Cache::TAGS] as $tag) {
 				$this->cleanEntry($found = $this->tagEntries($tag));
 				$entries = \array_merge($entries, $found);
 			}
 		}
 
-		if (isset($conds[\Nette\Caching\Cache::PRIORITY])) {
-			$this->cleanEntry($found = $this->priorityEntries($conds[\Nette\Caching\Cache::PRIORITY]));
+		if (isset($conds[Cache::PRIORITY])) {
+			$this->cleanEntry($found = $this->priorityEntries($conds[Cache::PRIORITY]));
 			$entries = \array_merge($entries, $found);
 		}
 
